@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>API de Integração do DAM Yapoli</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body { margin: 0; padding: 0; }
+      /* Oculta a versão renderizada ao lado do título (info.version) */
+      .api-info h1 > span { display: none; }
+    </style>
+  </head>
+  <body>
+    <redoc
+      spec-url="./openapi.yaml"
+      theme='{
+        "typography": {
+          "fontFamily": "Inter, system-ui, sans-serif",
+          "headings": { "fontFamily": "Montserrat, system-ui, sans-serif", "fontWeight": "600" },
+          "code": { "fontFamily": "JetBrains Mono, monospace" },
+          "links": { "color": "#00406E", "hover": "#D93D04" }
+        },
+        "colors": { "primary": { "main": "#00406E" } },
+        "sidebar": {
+          "width": "300px",
+          "textColor": "#00406E",
+          "activeTextColor": "#D93D04"
+        },
+        "rightPanel": { "backgroundColor": "#042C47" },
+        "logo": { "maxHeight": "140px", "maxWidth": "140px", "gutter": "20px" }
+      }'
+      hide-loading
+    ></redoc>
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+    <script>
+      // Redoc não oferece i18n para os labels do cabeçalho. Aguarda a
+      // info section renderizar e substitui os textos por PT-BR,
+      // preservando links e estrutura.
+      // Cada label tem um `apply(el)` que retorna true se a
+      // substituição foi feita. `text` troca apenas o primeiro
+      // text node que casar (preservando filhos como o <a> do
+      // botão Download); `attr` troca um atributo.
+      const text = (pattern, replacement) => (el) => {
+        for (const child of el.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE && pattern.test(child.nodeValue)) {
+            child.nodeValue = child.nodeValue.replace(pattern, replacement);
+            return true;
+          }
+        }
+        return false;
+      };
+      const attr = (name, value) => (el) => {
+        if (el.getAttribute(name) === value) return false;
+        el.setAttribute(name, value);
+        return true;
+      };
+      const LABELS = [
+        { selector: '.api-info p',    apply: text(/Download OpenAPI specification:?/, 'Baixar especificação OpenAPI:') },
+        { selector: 'input.search-input', apply: attr('placeholder', 'Pesquisar...') },
+      ];
+      new MutationObserver((_, obs) => {
+        let remaining = 0;
+        for (const label of LABELS) {
+          if (label.done) continue;
+          const found = [...document.querySelectorAll(label.selector)].some(label.apply);
+          if (found) label.done = true;
+          else remaining++;
+        }
+        if (remaining === 0) obs.disconnect();
+      }).observe(document.body, { childList: true, subtree: true });
+    </script>
+  </body>
+</html>
