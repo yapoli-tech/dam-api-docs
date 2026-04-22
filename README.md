@@ -72,15 +72,3 @@ A partir do próximo push, o site ficará acessível em
   a ordem da barra lateral.
 - Reutilize schemas via `$ref` para manter os formatos de requisição
   e resposta consistentes entre operações.
-
-## Origem do conteúdo
-
-A especificação em `openapi.yaml` foi escrita a partir de:
-
-- Uma coleção Postman cobrindo autenticação, CRUD de itens,
-  pesquisa (incluindo busca por atributo/SKU) e manutenção de
-  variantes.
-- Controllers e rotas no codebase Laravel `yapoli_manager`:
-  `AppLoginController`, `ItemAppSearchController`,
-  `ItemAppCrudController`, `ItemCrudController::saveVariant` e o
-  envelope compartilhado `ApiResponse`.
