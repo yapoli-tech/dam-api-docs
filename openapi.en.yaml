@@ -1,109 +1,112 @@
 openapi: 3.1.0
 info:
-  title: API de Integração do DAM Yapoli
+  title: Yapoli DAM Integration API
   version: "1.0.0"
-  summary: API pública para integrações de terceiros com a plataforma DAM Yapoli.
+  summary: Public API for third-party integrations with the Yapoli DAM platform.
   x-logo:
-    url: ./logo.jpg
+    url: ../logo.jpg
     altText: Yapoli
     href: https://www.yapoli.com/
   description: |
-    > This documentation is also available in **[English](en/)**.
+    > Esta documentação também está disponível em **[Português (Brasil)](../)**.
 
-    A **API de Integração do DAM Yapoli** permite que aplicações de
-    terceiros (ERPs, back-offices de e-commerce, ferramentas
-    de workflow) se autentiquem como uma Aplicação Yapoli
-    registrada e troquem informações de itens e metadados com um
-    tenant Yapoli.
+    The **Yapoli DAM Integration API** lets third-party
+    applications (ERPs, e-commerce back offices, workflow
+    tools) authenticate as a registered Yapoli Application and
+    exchange item and metadata information with a Yapoli
+    tenant.
 
-    Esta primeira versão documenta os endpoints utilizados em
-    integrações de catálogo e gestão de itens:
+    This first version documents the endpoints used in catalog
+    and item-management integrations:
 
-    - Autenticação como aplicação de terceiros.
-    - Busca de itens (incluindo rascunhos e busca por atributo/SKU).
-    - Criação, atualização e exclusão de itens e rascunhos.
-    - Manutenção de variantes de item (pares de atributo mestre /
-      atributo variante).
+    - Authenticating as a third-party application.
+    - Searching items (including drafts and attribute/SKU
+      lookup).
+    - Creating, updating and deleting items and drafts.
+    - Maintaining item variants (master attribute / variant
+      attribute pairs).
 
-    ## Primeiros passos
+    ## Getting started
 
-    1. Solicite ao administrador da sua conta Yapoli o provisionamento
-       de uma aplicação de terceiros. Você receberá um `app_id` (UUID)
-       e uma senha.
-    2. Troque essas credenciais por um token bearer chamando
+    1. Ask your Yapoli account administrator to provision a
+       third-party application. You will receive an `app_id`
+       (UUID) and a password.
+    2. Exchange those credentials for a bearer token by calling
        [`POST /api/app/login`](#operation/loginApp).
-    3. Chame qualquer outro endpoint `/api/app/*` com o header
-       `Authorization: Bearer <token>`.
+    3. Call every other `/api/app/*` endpoint with the
+       `Authorization: Bearer <token>` header.
 
-    ## Modelo de autenticação
+    ## Authentication model
 
-    - **Login** usa HTTP Basic authentication. O `app_id` é enviado
-      como username e a senha da aplicação como password. A
-      resposta contém um token bearer JWT.
-    - **Todos os demais endpoints** exigem esse token no header
-      `Authorization: Bearer <token>`.
-    - Tokens expiram. Por padrão, a validade é de **10 horas** a
-      partir da emissão (pode variar conforme a configuração do
-      ambiente). Quando uma chamada retornar `401`, chame
-      `POST /api/app/login` novamente para obter um token novo —
-      não há endpoint de refresh dedicado para tokens de
-      aplicação.
+    - **Login** uses HTTP Basic authentication. The `app_id` is
+      sent as the username and the application password as the
+      password. The response contains a JWT bearer token.
+    - **Every other endpoint** requires that token in the
+      `Authorization: Bearer <token>` header.
+    - Tokens expire. By default they are valid for **10 hours**
+      from issuance (this may vary depending on the environment
+      configuration). When a call returns `401`, call
+      `POST /api/app/login` again to obtain a fresh token —
+      there is no dedicated refresh endpoint for application
+      tokens.
 
-    ## Distribuições
+    ## Distributions
 
-    Uma **distribuição** é um canal de entrega configurado no seu
-    tenant Yapoli — ela define *onde* e *como* os assets derivados
-    dos itens (imagens, vídeos, documentos) são publicados. Cada
-    tenant pode ter várias distribuições, cada uma apontando para
-    um destino distinto (ex.: CDN do site público, FTP de um
-    parceiro, bucket privado de uma integração).
+    A **distribution** is a delivery channel configured in your
+    Yapoli tenant — it defines *where* and *how* the assets
+    derived from items (images, videos, documents) are
+    published. Each tenant can have several distributions, each
+    one pointing to a different destination (e.g. the public
+    website's CDN, a partner's FTP, a private bucket for an
+    integration).
 
-    Cada distribuição carrega:
+    Each distribution carries:
 
-    - **Receitas** — transformações aplicadas aos assets antes da
-      publicação (redimensionamento, conversão de formato etc.).
-    - **Tipo de entrega** — atualmente `CDN` (padrão) ou `FTP`.
-    - **Identificador** — UUID utilizado para escolher a
-      distribuição nas chamadas da API.
+    - **Recipes** — transformations applied to the assets
+      before publication (resizing, format conversion, etc.).
+    - **Delivery type** — currently `CDN` (default) or `FTP`.
+    - **Identifier** — UUID used to select the distribution in
+      API calls.
 
-    ### Como a distribuição afeta suas chamadas
+    ### How the distribution affects your calls
 
-    Ao autenticar via `POST /api/app/login`, você pode informar
-    `distribution_id` no corpo:
+    When authenticating via `POST /api/app/login`, you may send
+    `distribution_id` in the body:
 
-    - **Informando `distribution_id`**: o token fica restrito a
-      essa distribuição. Pesquisas de itens retornam apenas os
-      itens publicados nela.
-    - **Omitindo `distribution_id`**: o token usa a distribuição
-      padrão associada à sua aplicação no Yapoli.
+    - **Sending `distribution_id`**: the token is scoped to
+      that distribution. Item searches only return items
+      published in it.
+    - **Omitting `distribution_id`**: the token uses the
+      default distribution associated with your application in
+      Yapoli.
 
-    Na resposta de `POST /api/app/items`, cada item traz o campo
-    `distribution.distribution_id` indicando a qual distribuição
-    ele pertence.
+    In the `POST /api/app/items` response, each item carries
+    the `distribution.distribution_id` field indicating which
+    distribution it belongs to.
 
-    ## Atributos e tipos de dados
+    ## Attributes and data types
 
-    **Atributos são dinâmicos e definidos por tenant.** Cada
-    tenant Yapoli mantém seu próprio catálogo de atributos
-    (metadados), criado pelos administradores conforme a
-    necessidade do negócio. Não existe uma lista fixa de atributos
-    na API — cada atributo é identificado por um `attribute_id`
-    (UUID) emitido no seu tenant.
+    **Attributes are dynamic and defined per tenant.** Each
+    Yapoli tenant maintains its own catalog of attributes
+    (metadata), created by the administrators as the business
+    requires. There is no fixed list of attributes in the API —
+    each attribute is identified by an `attribute_id` (UUID)
+    issued in your tenant.
 
-    Peça ao administrador da sua conta Yapoli a relação dos
-    atributos que sua aplicação precisa ler/escrever.
+    Ask your Yapoli account administrator for the list of
+    attributes your application needs to read/write.
 
-    ### Como enviar valores de atributos
+    ### How to send attribute values
 
-    Ao criar ou atualizar um item, cada entrada do array
-    `attributes` tem sempre o mesmo formato — o que muda é a forma
-    do campo `value` conforme o tipo configurado no catálogo do
-    tenant. Os tipos suportados são **`text`**, **`number`**,
-    **`date`** e **`list`**.
+    When creating or updating an item, every entry in the
+    `attributes` array has the same shape — what changes is the
+    form of the `value` field, according to the type configured
+    in the tenant's catalog. The supported types are
+    **`text`**, **`number`**, **`date`** and **`list`**.
 
-    #### `text` — texto livre
+    #### `text` — free text
 
-    String comum.
+    A plain string.
 
     ```json
     {
@@ -113,10 +116,10 @@ info:
     }
     ```
 
-    #### `number` — numérico
+    #### `number` — numeric
 
-    Aceita inteiros e decimais. Pode ser enviado como número ou
-    como string — o backend faz a conversão.
+    Accepts integers and decimals. It can be sent as a number
+    or as a string — the backend performs the conversion.
 
     ```json
     {
@@ -134,9 +137,10 @@ info:
     }
     ```
 
-    #### `date` — data ou data/hora em ISO-8601
+    #### `date` — ISO-8601 date or date/time
 
-    Aceita apenas a data (`YYYY-MM-DD`) ou data/hora com timezone.
+    Accepts a date only (`YYYY-MM-DD`) or a date/time with
+    timezone.
 
     ```json
     {
@@ -154,12 +158,12 @@ info:
     }
     ```
 
-    #### `list` — valor de lista enumerada
+    #### `list` — enumerated list value
 
-    Envie uma das opções cadastradas no tenant. Para atributos
-    configurados como seleção única, `value` é uma string; quando
-    configurados como multisseleção (`list_type: "multiple"`),
-    envie um array.
+    Send one of the options registered in the tenant. For
+    attributes configured as single-select, `value` is a
+    string; when configured as multi-select
+    (`list_type: "multiple"`), send an array.
 
     ```json
     {
@@ -177,87 +181,93 @@ info:
     }
     ```
 
-    Se a sua aplicação foi configurada com
-    `list_value_implicit_registration`, valores novos são
-    adicionados ao catálogo automaticamente no momento da
-    criação/atualização do item. Caso contrário, enviar um valor
-    que não exista na lista retorna `422`.
+    If your application was configured with
+    `list_value_implicit_registration`, new values are added to
+    the catalog automatically when the item is
+    created/updated. Otherwise, sending a value that does not
+    exist in the list returns `422`.
 
-    ## Envelope de resposta
+    ## Response envelope
 
-    Respostas bem-sucedidas retornam o payload **diretamente** como
-    corpo JSON (sem uma chave `data` envolvendo o conteúdo). Dois
-    headers customizados estão sempre presentes:
+    Successful responses return the payload **directly** as the
+    JSON body (without a `data` key wrapping the content). Two
+    custom headers are always present:
 
-    | Header              | Significado                                 |
-    | ------------------- | ------------------------------------------- |
-    | `X-Status-Response` | `1` em caso de sucesso, `0` em caso de erro.|
-    | `X-Message`         | Mensagem curta e legível sobre o resultado. |
+    | Header              | Meaning                                        |
+    | ------------------- | ---------------------------------------------- |
+    | `X-Status-Response` | `1` on success, `0` on error.                  |
+    | `X-Message`         | Short human-readable message about the result. |
 
-    Respostas de erro seguem o mesmo formato, porém com um status
-    HTTP diferente de 2xx e um objeto `errors` descrevendo falhas
-    de validação por campo, quando aplicável.
+    Error responses follow the same format, but with a non-2xx
+    HTTP status and an `errors` object describing per-field
+    validation failures, when applicable.
 
-    ## Limite de requisições
+    > **Note:** human-readable messages produced by the API —
+    > the `X-Message` header and the `message` / `errors`
+    > fields of error bodies — may be returned in Portuguese.
+    > The response examples in this reference show literal API
+    > payloads, which is why some of them appear in Portuguese.
 
-    Todos os endpoints `/api/app/*` compartilham um mesmo bucket
-    de rate limit (`app-api`). Quando o limite é excedido, a
-    resposta retorna `429 Too Many Requests` com um header
-    `Retry-After` indicando quantos segundos aguardar antes de
-    tentar novamente.
+    ## Rate limiting
 
-    ## Fluxo típico de criação de item
+    All `/api/app/*` endpoints share a single rate-limit bucket
+    (`app-api`). When the limit is exceeded, the response
+    returns `429 Too Many Requests` with a `Retry-After` header
+    indicating how many seconds to wait before trying again.
+
+    ## Typical item creation flow
 
     ```text
     ┌────────────────────────┐
-    │ POST /api/app/login    │  (uma vez por sessão, Basic auth)
+    │ POST /api/app/login    │  (once per session, Basic auth)
     └──────────┬─────────────┘
-               │ token bearer
+               │ bearer token
                ▼
     ┌────────────────────────┐
-    │ POST /api/app/item     │  cria rascunho  (is_draft: true)
+    │ POST /api/app/item     │  creates a draft  (is_draft: true)
     └──────────┬─────────────┘
-               │ id do item
+               │ item id
                ▼
     ┌────────────────────────┐
-    │ PATCH /api/item/{id}/  │  (opcional) uma chamada por
-    │        variant         │  atributo de variante
+    │ PATCH /api/item/{id}/  │  (optional) one call per
+    │        variant         │  variant attribute
     └──────────┬─────────────┘
                │
                ▼
     ┌────────────────────────┐
-    │ PUT /api/app/item/{id} │  publica / finaliza
+    │ PUT /api/app/item/{id} │  publishes / finalizes
     └────────────────────────┘
     ```
 
-    O passo **PATCH** é opcional — use apenas quando o item tiver
-    variantes a registrar. Itens sem variantes vão direto do
-    `POST /api/app/item` para o `PUT /api/app/item/{id}` final.
+    The **PATCH** step is optional — use it only when the item
+    has variants to register. Items without variants go
+    straight from `POST /api/app/item` to the final
+    `PUT /api/app/item/{id}`.
   contact:
-    name: Suporte Yapoli
+    name: Yapoli Support
     email: suporte@yapoli.com
     url: https://www.yapoli.com/
 
 servers:
   - url: https://service.yapoli.io
-    description: Produção
+    description: Production
   - url: https://service-staging.yapoli.io
-    description: Homologação
+    description: Staging
 
 tags:
-  - name: Autenticação
+  - name: Authentication
     description: |
-      Obtenha tokens bearer usados para autorizar todas as demais
-      chamadas.
-  - name: Itens
+      Obtain the bearer tokens used to authorize every other
+      call.
+  - name: Items
     description: |
-      Crie, atualize, exclua e pesquise itens (produtos, assets,
-      rascunhos) em um tenant Yapoli.
-  - name: Variantes
+      Create, update, delete and search items (products,
+      assets, drafts) in a Yapoli tenant.
+  - name: Variants
     description: |
-      Mantenha relações de variante entre um valor de atributo
-      mestre e valores de atributos variantes (ex.: cor, tamanho,
-      tipo de embalagem).
+      Maintain variant relationships between a master attribute
+      value and variant attribute values (e.g. color, size,
+      packaging type).
 
 security:
   - bearerAuth: []
@@ -265,19 +275,19 @@ security:
 paths:
   /api/app/login:
     post:
-      tags: [Autenticação]
-      summary: Troca credenciais da aplicação por um token bearer
+      tags: [Authentication]
+      summary: Exchange application credentials for a bearer token
       operationId: loginApp
       description: |
-        Autentica uma aplicação de terceiros usando HTTP Basic
-        authentication. Envie o `app_id` (UUID emitido pela
-        Yapoli) como username e a senha da aplicação como
-        password. Os tokens são JWTs com escopo da aplicação;
-        armazene-os de forma segura.
+        Authenticates a third-party application using HTTP
+        Basic authentication. Send the `app_id` (UUID issued by
+        Yapoli) as the username and the application password as
+        the password. Tokens are application-scoped JWTs; store
+        them securely.
 
-        Opcionalmente, é possível restringir o token a uma
-        distribuição específica informando `distribution_id` no
-        corpo JSON.
+        Optionally, the token can be restricted to a specific
+        distribution by sending `distribution_id` in the JSON
+        body.
       security:
         - basicAuth: []
       requestBody:
@@ -291,15 +301,15 @@ paths:
                   type: string
                   format: uuid
                   description: |
-                    Contexto de distribuição opcional. Quando
-                    informado, o token passa a ter escopo nesta
-                    distribuição e as buscas de itens serão
-                    restritas a ela.
+                    Optional distribution context. When sent,
+                    the token becomes scoped to this
+                    distribution and item searches will be
+                    restricted to it.
             example:
               distribution_id: "5f7c2d30-1a4e-4b8a-9c3a-8b0a1d5e2f10"
       responses:
         "200":
-          description: Autenticação realizada com sucesso.
+          description: Authentication succeeded.
           content:
             application/json:
               schema:
@@ -307,7 +317,7 @@ paths:
               example:
                 token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhcHAifQ.xxxxx
         "401":
-          description: Credenciais inválidas.
+          description: Invalid credentials.
           content:
             application/json:
               schema:
@@ -315,7 +325,7 @@ paths:
               example:
                 message: Acesso negado.
         "422":
-          description: Parâmetros `app_id` / `password` ausentes ou inválidos.
+          description: Missing or invalid `app_id` / `password` parameters.
           content:
             application/json:
               schema:
@@ -335,44 +345,46 @@ paths:
 
   /api/app/items:
     post:
-      tags: [Itens]
-      summary: Pesquisar itens
+      tags: [Items]
+      summary: Search items
       operationId: searchItems
       description: |
-        Retorna uma lista paginada de itens visíveis para a
-        aplicação autenticada.
+        Returns a paginated list of items visible to the
+        authenticated application.
 
-        Este único endpoint atende a três casos de uso comuns.
-        Em todos eles, **sempre informe `fields`** para restringir
-        a projeção ao que a sua aplicação realmente consome — isso
-        reduz o payload e melhora a performance da pesquisa:
+        This single endpoint covers three common use cases. In
+        all of them, **always send `fields`** to restrict the
+        projection to what your application actually consumes —
+        this reduces the payload and improves search
+        performance:
 
-        | Caso de uso                     | Como                                                               |
-        | ------------------------------- | ------------------------------------------------------------------ |
-        | Listar itens publicados         | Informe `{ "fields": [...] }`.                                     |
-        | Listar rascunhos                | Informe `"isDraft": true` junto com `fields`.                      |
-        | Buscar por atributo/SKU         | Use `filters` com `filter_value.{attribute_id}` junto com `fields`.|
+        | Use case                | How                                                                 |
+        | ----------------------- | ------------------------------------------------------------------- |
+        | List published items    | Send `{ "fields": [...] }`.                                         |
+        | List drafts             | Send `"isDraft": true` along with `fields`.                         |
+        | Search by attribute/SKU | Use `filters` with `filter_value.{attribute_id}` along with `fields`.|
 
-        ### Paginação
+        ### Pagination
 
-        Dois modos são suportados:
+        Two modes are supported:
 
-        - **Paginação por página** — informe `page` e `rowsPerPage`
-          para paginação tradicional por offset. Simples, porém
-          custosa quando o resultado ultrapassa alguns milhares de
-          linhas.
-        - **Paginação por cursor** (recomendada para grandes
-          volumes) — omita `page`. A primeira resposta retorna
-          `pit` e `search_after`; envie ambos na próxima
-          requisição.
+        - **Page-based pagination** — send `page` and
+          `rowsPerPage` for traditional offset pagination.
+          Simple, but expensive once the result set grows
+          beyond a few thousand rows.
+        - **Cursor-based pagination** (recommended for large
+          volumes) — omit `page`. The first response returns
+          `pit` and `search_after`; send both in the next
+          request.
 
-        ### Projeção de campos
+        ### Field projection
 
-        Use `fields` para escolher quais atributos do item retornam.
-        O valor especial `"tags"` inclui arrays de tags de assets;
-        `"dimensions"` inclui objetos de dimensões de assets. Quando
-        `metadata_values` é `true` (padrão), os valores de atributos
-        são anexados a cada item sob a chave `attribute`.
+        Use `fields` to choose which item attributes are
+        returned. The special value `"tags"` includes asset tag
+        arrays; `"dimensions"` includes asset dimension
+        objects. When `metadata_values` is `true` (the
+        default), attribute values are attached to each item
+        under the `attribute` key.
       requestBody:
         required: false
         content:
@@ -381,18 +393,18 @@ paths:
               $ref: "#/components/schemas/ItemSearchRequest"
             examples:
               listPublished:
-                summary: Listar itens publicados (padrão)
+                summary: List published items (default)
                 value:
                   fields: [id, category, segment, division, name]
                   metadata_values: true
               listDrafts:
-                summary: Listar apenas rascunhos
+                summary: List drafts only
                 value:
                   isDraft: true
                   fields: [id, category, segment, division, name]
                   metadata_values: true
               searchBySku:
-                summary: Buscar item por SKU
+                summary: Search an item by SKU
                 value:
                   fields: [id, category, segment, division, name]
                   metadata_values: true
@@ -400,19 +412,19 @@ paths:
                     filter_value.b67db1a7-c9c4-4c29-9081-7cf4d548a7eb: "7896419700012"
       responses:
         "200":
-          description: Resultados da pesquisa.
+          description: Search results.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ItemSearchResponse"
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: Nenhum item corresponde aos filtros informados.
+          description: No item matches the given filters.
           content:
             application/json:
               schema:
@@ -420,12 +432,12 @@ paths:
               example:
                 message: Nenhum item encontrado
         "429":
-          description: Limite de requisições excedido.
+          description: Rate limit exceeded.
           headers:
             Retry-After:
               schema:
                 type: integer
-              description: Segundos a aguardar antes de tentar novamente.
+              description: Seconds to wait before trying again.
       x-codeSamples:
         - lang: curl
           label: curl
@@ -443,22 +455,22 @@ paths:
 
   /api/app/item:
     post:
-      tags: [Itens]
-      summary: Criar um item ou rascunho
+      tags: [Items]
+      summary: Create an item or draft
       operationId: createItem
       description: |
-        Cria um novo item no tenant da aplicação autenticada.
+        Creates a new item in the authenticated application's
+        tenant.
 
-        Informe `"is_draft": true` para criá-lo como rascunho —
-        rascunhos não aparecem na pesquisa padrão de itens e podem
-        ser atualizados livremente até que estejam prontos para
-        publicação.
+        Send `"is_draft": true` to create it as a draft —
+        drafts do not appear in the default item search and can
+        be updated freely until they are ready for publication.
 
-        O array `attributes` define os metadados customizados.
-        Cada atributo é identificado pelo seu `attribute_id`
-        (UUID). O campo `label` é opcional e descritivo; o
-        `attribute_id` é o que identifica unicamente o slot de
-        metadado.
+        The `attributes` array defines the custom metadata.
+        Each attribute is identified by its `attribute_id`
+        (UUID). The `label` field is optional and descriptive;
+        the `attribute_id` is what uniquely identifies the
+        metadata slot.
       requestBody:
         required: true
         content:
@@ -490,7 +502,7 @@ paths:
                   value: "7896419700012"
       responses:
         "201":
-          description: Item (ou rascunho) criado com sucesso.
+          description: Item (or draft) created successfully.
           content:
             application/json:
               schema:
@@ -498,19 +510,19 @@ paths:
               example:
                 id: d5ef27a1-4eef-4e8c-b6d0-27fcbd6a5e14
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
-          description: O chamador não tem permissão para criar itens no tenant alvo.
+          description: The caller is not allowed to create items in the target tenant.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: Dados inválidos (campo obrigatório ausente, UUID malformado etc.).
+          description: Invalid data (missing required field, malformed UUID, etc.).
           content:
             application/json:
               schema:
@@ -532,21 +544,21 @@ paths:
     parameters:
       - $ref: "#/components/parameters/ItemId"
     put:
-      tags: [Itens]
-      summary: Atualizar um item por ID
+      tags: [Items]
+      summary: Update an item by ID
       operationId: updateItem
       description: |
-        Atualiza parcialmente um item existente. Envie apenas os
-        campos que deseja modificar. O array `attributes`, quando
-        presente, **substitui** o conjunto existente — para
-        preservar atributos não relacionados, leia o item antes e
-        reenvie-os inalterados.
+        Partially updates an existing item. Send only the
+        fields you want to change. The `attributes` array, when
+        present, **replaces** the existing set — to preserve
+        unrelated attributes, read the item first and resend
+        them unchanged.
 
-        Quando você não tem o UUID do item mas conhece um atributo
-        único (ex.: SKU, DUN, EAN), use
+        When you don't have the item's UUID but know a unique
+        attribute (e.g. SKU, DUN, EAN), use
         [`PUT /api/app/item/by-attribute`](#operation/updateItemByAttribute)
-        para atualizar em um único passo, sem precisar pesquisar o
-        item primeiro.
+        to update it in a single step, without having to search
+        for the item first.
       requestBody:
         required: true
         content:
@@ -569,7 +581,7 @@ paths:
                   value: "7891234567890"
       responses:
         "200":
-          description: Item atualizado. O corpo inclui o nome de taxonomia atualizado.
+          description: Item updated. The body includes the updated taxonomy name.
           content:
             application/json:
               schema:
@@ -577,75 +589,75 @@ paths:
                 properties:
                   taxonomy:
                     type: string
-                    description: Taxonomia atualizada após a alteração.
+                    description: Updated taxonomy after the change.
               example:
                 taxonomy: ITEM-EXEMPLO-001
         "204":
-          description: Item atualizado (sem campos alterados a retornar).
+          description: Item updated (no changed fields to return).
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
         "403":
-          description: O chamador não tem permissão para gerenciar este item.
+          description: The caller is not allowed to manage this item.
         "404":
-          description: Item não encontrado.
+          description: Item not found.
         "422":
-          description: Dados inválidos.
+          description: Invalid data.
     delete:
-      tags: [Itens]
-      summary: Excluir um item ou rascunho
+      tags: [Items]
+      summary: Delete an item or draft
       operationId: deleteItem
       description: |
-        Remove um item ou rascunho do tenant de forma permanente.
-        A operação é irreversível. Se o item possuir dependências
-        publicadas, a chamada falhará com `403`.
+        Permanently removes an item or draft from the tenant.
+        This operation is irreversible. If the item has
+        published dependencies, the call fails with `403`.
       responses:
         "204":
-          description: Item excluído.
+          description: Item deleted.
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
         "403":
-          description: O chamador não tem permissão para excluir este item.
+          description: The caller is not allowed to delete this item.
         "404":
-          description: Item não encontrado.
+          description: Item not found.
 
   /api/app/item/{id}/asset/upload:
     parameters:
       - $ref: "#/components/parameters/ItemId"
     post:
-      tags: [Itens]
-      summary: Fazer upload de asset(s) para um item
+      tags: [Items]
+      summary: Upload asset(s) to an item
       operationId: uploadItemAssets
       description: |
-        Envia um ou mais arquivos como **assets** de um item
-        existente. Os arquivos são armazenados no storage da
-        Yapoli e passam pelo pipeline de processamento
-        (geração de thumbnails, normalização, indexação); o
-        processamento é assíncrono e o asset fica disponível
-        para download quando o pipeline conclui.
+        Uploads one or more files as **assets** of an existing
+        item. The files are stored in Yapoli's storage and go
+        through the processing pipeline (thumbnail generation,
+        normalization, indexing); processing is asynchronous
+        and the asset becomes available for download once the
+        pipeline finishes.
 
-        A requisição **deve ser `multipart/form-data`**, com o
-        campo `files` contendo um ou mais arquivos.
+        The request **must be `multipart/form-data`**, with the
+        `files` field containing one or more files.
 
-        ### Modos de upload
+        ### Upload modes
 
-        O ambiente opera em um de dois modos (configurado por
-        Yapoli no deploy do tenant):
+        The environment operates in one of two modes
+        (configured by Yapoli when the tenant is deployed):
 
-        | Modo          | Arquivos por requisição | Extensões aceitas                                                    |
-        | ------------- | ----------------------- | -------------------------------------------------------------------- |
-        | `restricted`  | 1                       | `htm`, `html`                                                        |
-        | `full`        | vários                  | imagens, vídeos, áudio, docs, arquivos de design, compactados etc.   |
+        | Mode          | Files per request | Accepted extensions                                                  |
+        | ------------- | ----------------- | --------------------------------------------------------------------- |
+        | `restricted`  | 1                 | `htm`, `html`                                                          |
+        | `full`        | several           | images, videos, audio, docs, design files, archives, etc.             |
 
-        Se o ambiente estiver em `restricted`, enviar mais de um
-        arquivo ou qualquer extensão fora da lista retorna `422`.
-        Confirme com o seu administrador Yapoli qual modo está
-        ativo.
+        If the environment is in `restricted` mode, sending
+        more than one file or any extension outside the list
+        returns `422`. Check with your Yapoli administrator
+        which mode is active.
 
-        ### Pré-requisitos
+        ### Prerequisites
 
-        A aplicação que autentica precisa ter a flag
-        `with_upload` habilitada no tenant. Sem ela, a chamada
-        retorna `403` mesmo com token válido.
+        The authenticating application must have the
+        `with_upload` flag enabled in the tenant. Without it,
+        the call returns `403` even with a valid token.
       requestBody:
         required: true
         content:
@@ -657,14 +669,14 @@ paths:
                 files:
                   type: array
                   description: |
-                    Um ou mais arquivos a subir (em modo
-                    `restricted`, apenas um).
+                    One or more files to upload (in
+                    `restricted` mode, only one).
                   items:
                     type: string
                     format: binary
       responses:
         "201":
-          description: Upload concluído e asset(s) vinculados ao item.
+          description: Upload finished and asset(s) linked to the item.
           content:
             application/json:
               schema:
@@ -674,30 +686,30 @@ paths:
                 uploaded_asset_ids:
                   - 5b3a8c92-0f9d-4aef-9f25-3c4e1a7b6f11
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
           description: |
-            A aplicação não tem permissão de upload
-            (`with_upload` desabilitado) ou o chamador não pode
-            gerenciar o item.
+            The application does not have upload permission
+            (`with_upload` disabled) or the caller cannot
+            manage the item.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: Item não encontrado.
+          description: Item not found.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
           description: |
-            Arquivo ausente, extensão não permitida ou mais de um
-            arquivo em modo `restricted`.
+            Missing file, extension not allowed, or more than
+            one file in `restricted` mode.
           content:
             application/json:
               schema:
@@ -712,34 +724,34 @@ paths:
           source: |
             curl -X POST "https://service.yapoli.io/api/app/item/d5ef27a1-4eef-4e8c-b6d0-27fcbd6a5e14/asset/upload" \
               -H "Authorization: Bearer <token>" \
-              -F "files[]=@/caminho/para/foto.jpg"
+              -F "files[]=@/path/to/photo.jpg"
 
   /api/app/item/by-attribute:
     put:
-      tags: [Itens]
-      summary: Atualizar um item buscando por atributo único
+      tags: [Items]
+      summary: Update an item by unique attribute lookup
       operationId: updateItemByAttribute
       description: |
-        Atualiza um item sem precisar do seu UUID: a API procura
-        o item pelo valor de um atributo único (por exemplo SKU,
-        DUN ou EAN) e aplica o mesmo fluxo do
+        Updates an item without needing its UUID: the API looks
+        the item up by the value of a unique attribute (for
+        example SKU, DUN or EAN) and applies the same flow as
         [`PUT /api/app/item/{id}`](#operation/updateItem).
 
-        Além dos campos normais de update, o corpo precisa
-        informar:
+        Besides the regular update fields, the body must
+        include:
 
-        - `lookup_attribute_id` — UUID do atributo de busca.
-        - `lookup_attribute_value` — valor a procurar.
+        - `lookup_attribute_id` — UUID of the lookup attribute.
+        - `lookup_attribute_value` — value to look for.
 
-        O atributo escolhido precisa ser **único** no tenant: se
-        a busca retornar mais de um item, a chamada falha com
-        `422` para evitar atualizações acidentais. Se nenhum item
-        corresponder, retorna `404`.
+        The chosen attribute must be **unique** in the tenant:
+        if the lookup returns more than one item, the call
+        fails with `422` to prevent accidental updates. If no
+        item matches, it returns `404`.
 
-        Uma vez resolvido o item, o restante do corpo é aplicado
-        exatamente como em `updateItem` — inclusive a regra de
-        que `attributes`, quando enviado, substitui a lista
-        existente.
+        Once the item is resolved, the rest of the body is
+        applied exactly as in `updateItem` — including the rule
+        that `attributes`, when sent, replaces the existing
+        list.
       requestBody:
         required: true
         content:
@@ -758,7 +770,7 @@ paths:
                   value: "7891234567890"
       responses:
         "200":
-          description: Item encontrado e atualizado. Corpo com a taxonomia refrescada.
+          description: Item found and updated. Body carries the refreshed taxonomy.
           content:
             application/json:
               schema:
@@ -766,17 +778,17 @@ paths:
                 properties:
                   taxonomy:
                     type: string
-                    description: Taxonomia atualizada após a alteração.
+                    description: Updated taxonomy after the change.
               example:
                 taxonomy: ITEM-EXEMPLO-001
         "204":
-          description: Item encontrado e atualizado (sem campos a retornar).
+          description: Item found and updated (no fields to return).
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
         "403":
-          description: O chamador não tem permissão para gerenciar o item encontrado.
+          description: The caller is not allowed to manage the matched item.
         "404":
-          description: Nenhum item encontrado com o atributo informado.
+          description: No item found with the given attribute.
           content:
             application/json:
               schema:
@@ -785,8 +797,8 @@ paths:
                 message: Item not found with given attribute value
         "422":
           description: |
-            Dados inválidos — `lookup_attribute_id` / `lookup_attribute_value`
-            ausentes, ou a busca retornou mais de um item.
+            Invalid data — `lookup_attribute_id` / `lookup_attribute_value`
+            missing, or the lookup returned more than one item.
           content:
             application/json:
               schema:
@@ -812,29 +824,29 @@ paths:
     parameters:
       - $ref: "#/components/parameters/ItemId"
     patch:
-      tags: [Variantes]
-      summary: Adicionar ou atualizar um valor de atributo variante
+      tags: [Variants]
+      summary: Add or update a variant attribute value
       operationId: saveVariant
       description: |
-        Associa um valor de atributo variante a um valor de
-        atributo mestre no item informado. Este endpoint deve ser
-        chamado uma vez para cada atributo variante que se deseja
-        armazenar.
+        Associates a variant attribute value with a master
+        attribute value on the given item. This endpoint must
+        be called once for each variant attribute you want to
+        store.
 
-        Uma variante é definida por dois pares:
+        A variant is defined by two pairs:
 
-        - `master_attribute_id` + `master_attribute_value` — o
-          discriminador que agrupa as variantes
-          (ex.: um código de produto).
+        - `master_attribute_id` + `master_attribute_value` —
+          the discriminator that groups the variants
+          (e.g. a product code).
         - `variant_attribute_id` + `variant_attribute_value` —
-          o atributo cujo valor muda entre variantes
-          (ex.: tipo de embalagem, pares por pacote, DUN).
+          the attribute whose value changes across variants
+          (e.g. packaging type, pairs per package, DUN).
 
-        Para adicionar várias dimensões de variante ao mesmo
-        valor mestre, chame o endpoint repetidamente com o mesmo
-        `master_attribute_id` / `master_attribute_value` e pares
-        diferentes de `variant_attribute_id` /
-        `variant_attribute_value`.
+        To add several variant dimensions to the same master
+        value, call the endpoint repeatedly with the same
+        `master_attribute_id` / `master_attribute_value` and
+        different `variant_attribute_id` /
+        `variant_attribute_value` pairs.
       requestBody:
         required: true
         content:
@@ -876,15 +888,15 @@ paths:
                     variant_attribute_value: "7896419700012"
       responses:
         "200":
-          description: Variante salva.
+          description: Variant saved.
         "401":
-          description: Token bearer ausente ou inválido.
+          description: Missing or invalid bearer token.
         "403":
-          description: O chamador não tem permissão para gerenciar este item.
+          description: The caller is not allowed to manage this item.
         "404":
-          description: Item não encontrado.
+          description: Item not found.
         "422":
-          description: Payload de variante inválido.
+          description: Invalid variant payload.
           content:
             application/json:
               schema:
@@ -896,24 +908,24 @@ components:
       type: http
       scheme: basic
       description: |
-        HTTP Basic auth utilizado apenas em `POST /api/app/login`.
-        O username é o `app_id` (UUID); a password é o segredo da
-        aplicação emitido pela Yapoli.
+        HTTP Basic auth used only on `POST /api/app/login`. The
+        username is the `app_id` (UUID); the password is the
+        application secret issued by Yapoli.
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
       description: |
-        JWT retornado por `POST /api/app/login`. Envie-o como
-        `Authorization: Bearer <token>` em todas as chamadas que
-        não sejam de login.
+        JWT returned by `POST /api/app/login`. Send it as
+        `Authorization: Bearer <token>` on every non-login
+        call.
 
   parameters:
     ItemId:
       name: id
       in: path
       required: true
-      description: UUID do item sobre o qual operar.
+      description: UUID of the item to operate on.
       schema:
         type: string
         format: uuid
@@ -926,9 +938,9 @@ components:
         token:
           type: string
           description: |
-            Token bearer JWT. Envie como
-            `Authorization: Bearer <token>` em todas as chamadas
-            que não sejam de login.
+            JWT bearer token. Send it as
+            `Authorization: Bearer <token>` on every non-login
+            call.
           example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 
     Error:
@@ -937,13 +949,13 @@ components:
       properties:
         message:
           type: string
-          description: Mensagem de erro legível.
+          description: Human-readable error message. May be returned in Portuguese.
           example: Parâmetros inválidos.
         errors:
           type: object
           description: |
-            Erros de validação por campo. As chaves são nomes de
-            campos e os valores são arrays de mensagens de erro.
+            Per-field validation errors. Keys are field names
+            and values are arrays of error messages.
           additionalProperties:
             type: array
             items:
@@ -958,7 +970,7 @@ components:
         id:
           type: string
           format: uuid
-          description: UUID do recurso recém-criado.
+          description: UUID of the newly created resource.
 
     AssetUploadResponse:
       type: object
@@ -967,14 +979,13 @@ components:
         item_id:
           type: string
           format: uuid
-          description: UUID do item ao qual os assets foram vinculados.
+          description: UUID of the item the assets were linked to.
         uploaded_asset_ids:
           type: array
           description: |
-            UUIDs dos assets criados, na mesma ordem em que os
-            arquivos foram enviados. Cada asset pode ainda estar
-            em processamento no pipeline da Yapoli logo após a
-            resposta.
+            UUIDs of the created assets, in the same order the
+            files were sent. Each asset may still be processing
+            in Yapoli's pipeline right after the response.
           items:
             type: string
             format: uuid
@@ -987,15 +998,14 @@ components:
           type: string
           format: uuid
           description: |
-            Identificador do atributo de metadado conforme
-            registrado no seu tenant Yapoli. Consulte o
-            administrador Yapoli para obter o catálogo de
-            atributos.
+            Identifier of the metadata attribute as registered
+            in your Yapoli tenant. Ask your Yapoli
+            administrator for the attribute catalog.
         value:
           description: |
-            Valor a ser armazenado. Normalmente uma string, mas
-            valores numéricos e booleanos também são aceitos
-            dependendo do tipo do atributo.
+            Value to store. Usually a string, but numeric and
+            boolean values are also accepted depending on the
+            attribute type.
           oneOf:
             - type: string
             - type: number
@@ -1006,9 +1016,9 @@ components:
         label:
           type: string
           description: |
-            Rótulo opcional para exibição. Não é utilizado pelo
-            servidor para correspondência — o `attribute_id` é
-            quem manda —, mas é útil em código e logs.
+            Optional display label. It is not used by the
+            server for matching — the `attribute_id` is what
+            counts — but it is useful in code and logs.
 
     ItemCreateRequest:
       type: object
@@ -1016,42 +1026,42 @@ components:
       properties:
         name:
           type: string
-          description: Nome legível do item.
+          description: Human-readable item name.
           example: ITEM-EXEMPLO-001
         description:
           type: string
-          description: Descrição em texto livre.
+          description: Free-text description.
         category_id:
           type: string
           format: uuid
-          description: UUID da categoria do item no tenant.
+          description: UUID of the item's category in the tenant.
         segment_id:
           type: string
           format: uuid
-          description: UUID do segmento do item no tenant.
+          description: UUID of the item's segment in the tenant.
         is_draft:
           type: boolean
           default: false
           description: |
-            Quando `true`, o item é criado como rascunho e não
-            aparecerá nas pesquisas de itens publicados até ser
-            atualizado com `is_draft: false` ou publicado.
+            When `true`, the item is created as a draft and
+            will not appear in published-item searches until it
+            is updated with `is_draft: false` or published.
         published:
           type: boolean
           description: |
-            Quando `true` e o chamador tiver permissão de
-            publicação, o item se torna visível imediatamente.
-            Ignorado para rascunhos.
+            When `true` and the caller has publish permission,
+            the item becomes visible immediately. Ignored for
+            drafts.
         attributes:
           type: array
-          description: Valores de metadados customizados anexados ao item.
+          description: Custom metadata values attached to the item.
           items:
             $ref: "#/components/schemas/ItemAttributeInput"
         assets:
           type: array
           description: |
-            Lista opcional de UUIDs de assets a serem associados
-            ao item no momento da criação.
+            Optional list of asset UUIDs to associate with the
+            item at creation time.
           items:
             type: string
             format: uuid
@@ -1059,9 +1069,9 @@ components:
     ItemUpdateRequest:
       type: object
       description: |
-        Todos os campos são opcionais — apenas os que forem
-        incluídos serão atualizados. O campo `attributes`, quando
-        presente, **substitui** a lista de atributos existente.
+        All fields are optional — only the ones included are
+        updated. The `attributes` field, when present,
+        **replaces** the existing attribute list.
       properties:
         name:
           type: string
@@ -1094,25 +1104,27 @@ components:
               type: string
               format: uuid
               description: |
-                UUID do atributo a usar como chave de busca. Deve
-                ser único no tenant (ex.: SKU, DUN, EAN).
+                UUID of the attribute to use as the lookup key.
+                It must be unique in the tenant (e.g. SKU, DUN,
+                EAN).
             lookup_attribute_value:
               type: string
-              description: Valor do atributo a procurar.
+              description: Attribute value to look for.
         - $ref: "#/components/schemas/ItemUpdateRequest"
 
     ItemSearchRequest:
       type: object
       description: |
-        Informe ao menos o campo `fields` para restringir a
-        projeção ao que a sua aplicação precisa. Os demais campos
-        são opcionais e filtram ou paginam o resultado.
+        Send at least the `fields` field to restrict the
+        projection to what your application needs. The
+        remaining fields are optional and filter or paginate
+        the result.
       properties:
         fields:
           type: array
           description: |
-            Subconjunto de campos de primeiro nível a incluir em
-            cada item retornado. Valores comuns: `id`, `name`,
+            Subset of top-level fields to include in each
+            returned item. Common values: `id`, `name`,
             `category`, `segment`, `division`, `tags`,
             `dimensions`.
           items:
@@ -1122,20 +1134,19 @@ components:
           type: boolean
           default: true
           description: |
-            Quando `true`, anexa os valores dos atributos a cada
-            item sob a chave `attribute`.
+            When `true`, attaches the attribute values to each
+            item under the `attribute` key.
         isDraft:
           type: boolean
           description: |
-            Quando `true`, retorna apenas rascunhos e ignora o
-            escopo por distribuição. Padrão `false`.
+            When `true`, returns only drafts and ignores
+            distribution scoping. Defaults to `false`.
         filters:
           type: object
           description: |
-            Filtros por correspondência exata, indexados pelo nome
-            do campo. Use `filter_value.{attribute_id}` para
-            filtrar por atributo customizado, por exemplo por
-            SKU/DUN/EAN.
+            Exact-match filters, keyed by field name. Use
+            `filter_value.{attribute_id}` to filter by a custom
+            attribute, for example by SKU/DUN/EAN.
           additionalProperties: true
           example:
             filter_value.b67db1a7-c9c4-4c29-9081-7cf4d548a7eb: "7896419700012"
@@ -1144,45 +1155,44 @@ components:
           items:
             $ref: "#/components/schemas/SearchKeyword"
           description: |
-            Filtros em formato de palavras-chave. Prefira
-            `filters` para correspondência exata; `searchKeywords`
-            destina-se a buscas full-text / normalizadas.
+            Keyword-style filters. Prefer `filters` for exact
+            matching; `searchKeywords` is meant for full-text /
+            normalized searches.
         rowsPerPage:
           type: integer
           default: 1000
           minimum: 1
           maximum: 10000
           description: |
-            Tamanho da página. Ignorado no modo cursor nas
-            requisições subsequentes.
+            Page size. Ignored in cursor mode on subsequent
+            requests.
         page:
           type: integer
           minimum: 1
           description: |
-            Número da página (1-based) para paginação por offset.
-            Omita para usar paginação por cursor.
+            Page number (1-based) for offset pagination. Omit
+            it to use cursor pagination.
         fromDate:
           type: string
           format: date-time
           description: |
-            Retorna apenas itens criados ou atualizados a partir
-            deste timestamp (ISO-8601).
+            Returns only items created or updated from this
+            timestamp (ISO-8601) onwards.
         outputAssetReferences:
           type: boolean
           default: false
-          description: Inclui IDs brutos de referência de assets na resposta.
+          description: Includes raw asset reference IDs in the response.
         pit:
           type: string
           description: |
-            Identificador de point-in-time retornado em uma
-            resposta de cursor anterior. Envie-o de volta para
-            continuar paginando.
+            Point-in-time identifier returned by a previous
+            cursor response. Send it back to keep paginating.
         search_after:
           type: array
           items: {}
           description: |
-            Token de cursor retornado em uma resposta de cursor
-            anterior.
+            Cursor token returned by a previous cursor
+            response.
 
     SearchKeyword:
       type: object
@@ -1190,7 +1200,7 @@ components:
       properties:
         field:
           type: string
-          description: "Nome do campo (ex.: `category`, `division`, `name`)."
+          description: "Field name (e.g. `category`, `division`, `name`)."
           example: category
         value:
           oneOf:
@@ -1227,9 +1237,8 @@ components:
         attribute:
           type: object
           description: |
-            Valores de metadados indexados pelo nome do atributo.
-            Presente quando `metadata_values` é `true` na
-            requisição.
+            Metadata values keyed by attribute name. Present
+            when `metadata_values` is `true` in the request.
           additionalProperties: true
         updated_at:
           type: string
@@ -1258,7 +1267,7 @@ components:
       properties:
         total:
           type: integer
-          description: Total de itens correspondentes.
+          description: Total number of matching items.
           example: 1342
         from:
           type: [integer, "null"]
@@ -1271,15 +1280,14 @@ components:
         pit:
           type: string
           description: |
-            Identificador de point-in-time para paginação por
-            cursor. Presente quando `page` é omitido na
-            requisição.
+            Point-in-time identifier for cursor pagination.
+            Present when `page` is omitted in the request.
         search_after:
           type: array
           items: {}
           description: |
-            Token de cursor. Envie-o de volta na próxima
-            requisição para buscar a próxima página.
+            Cursor token. Send it back in the next request to
+            fetch the next page.
 
     VariantRequest:
       type: object
@@ -1296,14 +1304,14 @@ components:
             master_attribute_id:
               type: string
               format: uuid
-              description: UUID do atributo mestre (discriminador).
+              description: UUID of the master attribute (discriminator).
             master_attribute_value:
               type: string
-              description: Valor do atributo mestre para este grupo de variantes.
+              description: Master attribute value for this variant group.
             variant_attribute_id:
               type: string
               format: uuid
-              description: UUID do atributo variante que está sendo definido.
+              description: UUID of the variant attribute being set.
             variant_attribute_value:
               type: string
-              description: Valor do atributo variante.
+              description: Variant attribute value.

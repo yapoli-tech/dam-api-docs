@@ -62,7 +62,7 @@
         return true;
       };
       const LABELS = [
-        { selector: '.api-info p',    apply: text(/Download OpenAPI specification:?/, 'Baixar especificação OpenAPI:') },
+        { selector: '.api-info p',    apply: text(/Download OpenAPI specification/, 'Baixar especificação OpenAPI') },
         { selector: 'input.search-input', apply: attr('placeholder', 'Pesquisar...') },
       ];
       new MutationObserver((_, obs) => {

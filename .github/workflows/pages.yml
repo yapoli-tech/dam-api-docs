@@ -22,8 +22,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Lint OpenAPI spec
-        run: npx --yes @redocly/cli lint openapi.yaml
+      - name: Lint OpenAPI specs (PT + EN)
+        run: npx --yes @redocly/cli lint openapi.yaml openapi.en.yaml
+      # openapi.en.yaml é a tradução de openapi.yaml: apenas campos de
+      # prosa podem diferir. Remove esses campos dos dois arquivos e
+      # compara o restante — qualquer divergência estrutural
+      # (endpoints, schemas, exemplos) quebra o build.
+      - name: Check PT/EN structural parity
+        run: |
+          strip() {
+            yq 'del(.. | .description?)
+              | del(.. | .summary?)
+              | del(.. | .title?)
+              | del(.. | .tags?)
+              | del(.. | .["x-codeSamples"]?)
+              | del(.info.contact)
+              | del(.info.["x-logo"])' "$1"
+          }
+          if ! diff -u <(strip openapi.yaml) <(strip openapi.en.yaml); then
+            echo "::error::openapi.yaml e openapi.en.yaml divergiram estruturalmente. Aplique toda mudança de endpoints/schemas/exemplos nos dois arquivos (traduzindo apenas a prosa)."
+            exit 1
+          fi
 
   deploy:
     needs: lint

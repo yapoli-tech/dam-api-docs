@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Yapoli DAM Integration API</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body { margin: 0; padding: 0; }
+      /* Oculta a versão renderizada ao lado do título (info.version) */
+      .api-info h1 > span { display: none; }
+    </style>
+  </head>
+  <body>
+    <redoc
+      spec-url="../openapi.en.yaml"
+      theme='{
+        "typography": {
+          "fontFamily": "Inter, system-ui, sans-serif",
+          "headings": { "fontFamily": "Montserrat, system-ui, sans-serif", "fontWeight": "600" },
+          "code": { "fontFamily": "JetBrains Mono, monospace" },
+          "links": { "color": "#00406E", "hover": "#D93D04" }
+        },
+        "colors": { "primary": { "main": "#00406E" } },
+        "sidebar": {
+          "width": "300px",
+          "textColor": "#00406E",
+          "activeTextColor": "#D93D04"
+        },
+        "rightPanel": { "backgroundColor": "#042C47" },
+        "logo": { "maxHeight": "140px", "maxWidth": "140px", "gutter": "20px" }
+      }'
+      hide-loading
+    ></redoc>
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+    <!--
+      Diferente do index.html da raiz (PT-BR), esta página não precisa
+      do script de substituição de labels: os textos padrão da UI do
+      Redoc já são em inglês.
+    -->
+  </body>
+</html>
