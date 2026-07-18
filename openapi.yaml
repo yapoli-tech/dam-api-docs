@@ -714,6 +714,114 @@ paths:
               -H "Authorization: Bearer <token>" \
               -F "files[]=@/caminho/para/foto.jpg"
 
+  /api/app/item/{id}/asset/presign:
+    parameters:
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [Itens]
+      summary: Obter uma URL assinada para enviar um asset direto ao storage
+      operationId: presignItemAsset
+      description: |
+        Retorna uma **URL `PUT` assinada** para enviar o arquivo
+        **direto ao storage (S3)** — os bytes **não** passam pela
+        API. Use no lugar de
+        [`POST .../asset/upload`](#operation/uploadItemAssets)
+        para **arquivos grandes** (ex.: vídeos de vários GB), em
+        que passar pelo servidor da API é lento ou pesado de
+        memória.
+
+        ### Fluxo
+
+        1. `POST` neste endpoint com o `filename`; você recebe uma
+           `put_url` válida por **4 horas**.
+        2. `PUT` dos bytes do arquivo na `put_url` — envie direto
+           ao storage e **não** adicione header `Authorization`
+           (a URL já é assinada). Sucesso retorna `200`.
+        3. O processamento é **assíncrono**: quando o arquivo cai
+           no storage, o pipeline cria o asset e o vincula ao item
+           automaticamente (miniaturas, normalização, indexação).
+           Nenhuma chamada de confirmação é necessária.
+
+        Qualquer extensão de arquivo é aceita aqui (diferente do
+        modo `restricted` do `.../asset/upload`).
+
+        ### Pré-requisitos
+
+        A aplicação autenticada precisa ter a flag `with_upload`
+        habilitada; caso contrário a chamada retorna `403`.
+
+        > Observação: se a URL assinada for gerada com credenciais
+        > temporárias (STS), a validade efetiva é limitada pela
+        > sessão da credencial, que pode ser menor que as 4 horas
+        > solicitadas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename]
+              properties:
+                filename:
+                  type: string
+                  description: |
+                    Nome original do arquivo. Usado como último
+                    segmento da chave no storage; o pipeline deriva
+                    a extensão a partir dele.
+            example:
+              filename: video.mp4
+      responses:
+        "201":
+          description: URL assinada gerada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignResponse"
+              example:
+                asset_id: a00637f0-9ed5-4559-b59a-4bfe80a7040f
+                s3_key: <client>/<region>/<app>/web/<item_id>/<asset_id>/video.mp4
+                bucket: yapoli-bucket-item-sp
+                put_url: https://<bucket>.s3.<region>.amazonaws.com/<key>?X-Amz-Expires=14400&X-Amz-Signature=...
+                put_headers:
+                  Host: ["<bucket>.s3.<region>.amazonaws.com"]
+                expires_in: 14400
+        "401":
+          description: Token bearer ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: A aplicação não tem permissão de upload (`with_upload` desabilitado).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Item não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Validação da requisição falhou (falta o `filename`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-codeSamples:
+        - lang: curl
+          label: 1. Obter a URL assinada
+          source: |
+            curl -X POST "https://service.yapoli.io/api/app/item/<item_id>/asset/presign" \
+              -H "Authorization: Bearer <token>" \
+              -H "Content-Type: application/json" \
+              -d '{ "filename": "video.mp4" }'
+        - lang: curl
+          label: 2. Enviar o arquivo direto ao storage
+          source: |
+            curl -X PUT "<put_url>" --upload-file /caminho/para/video.mp4
+
   /api/app/item/by-attribute:
     put:
       tags: [Itens]
@@ -978,6 +1086,36 @@ components:
           items:
             type: string
             format: uuid
+
+    PresignResponse:
+      type: object
+      required: [asset_id, s3_key, bucket, put_url, expires_in]
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+          description: UUID reservado para o asset (embutido na chave do storage).
+        s3_key:
+          type: string
+          description: Chave completa do objeto no storage para onde o arquivo deve ser enviado.
+        bucket:
+          type: string
+          description: Nome do bucket de destino.
+        put_url:
+          type: string
+          description: |
+            URL `PUT` assinada (válida por ~4 horas). Envie os
+            bytes do arquivo aqui com um HTTP `PUT`.
+        put_headers:
+          type: object
+          description: |
+            Headers que precisam ser replicados na requisição
+            `PUT`, quando presentes. Normalmente apenas `Host`.
+          additionalProperties: true
+        expires_in:
+          type: integer
+          description: Tempo de vida da URL em segundos (14400 = 4 horas).
+          example: 14400
 
     ItemAttributeInput:
       type: object
